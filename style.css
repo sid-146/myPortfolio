@@ -1,0 +1,23 @@
+body {
+  font-family: "Pixelify Sans", sans-serif; /* Apply Micro+5 font */
+  margin: 0;
+  padding: 0;
+  background-color: #f0f0f0;
+}
+
+.container {
+  text-align: center;
+  margin-top: 20%;
+}
+
+h1 {
+  color: #333;
+  font-size: 3em; /* Adjust font size */
+  font-weight: bold; /* Make the font bold */
+  text-transform: uppercase; /* Convert text to uppercase */
+}
+
+p {
+  color: #666;
+  font-size: 1.2em; /* Adjust font size */
+}
