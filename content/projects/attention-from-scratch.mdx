@@ -1,0 +1,170 @@
+---
+title: "Self-Attention Kernel & Inference Engine from Scratch"
+slug: "attention-from-scratch"
+description: "Implementation of FlashAttention-style tiled multi-head attention kernels in C++/CUDA and custom PyTorch C++ extensions with benchmark comparisons."
+date: "2026-07-28"
+category: "AI & ML"
+status: "completed"
+technologies: ["C++20", "CUDA", "PyTorch", "CMake", "Google Benchmark"]
+tags: ["Deep Learning Systems", "GPU Programming", "CUDA Kernels", "LLM Inference"]
+githubUrl: "https://github.com/sudhanwakeveeshwar/attention-from-scratch"
+demoUrl: "/lab"
+featured: true
+metrics:
+  - label: "Speedup vs Naive PyTorch"
+    value: "3.8x"
+  - label: "Peak SRAM Utilization"
+    value: "91%"
+  - label: "Max Sequence Length"
+    value: "32,768"
+order: 1
+---
+
+## Overview
+
+Modern Large Language Models spend the majority of their inference time compute and memory bandwidth inside the multi-head attention layer. Standard textbook implementations compute the full attention matrix `S = Q * K^T / sqrt(d_k)`, materialize the `N x N` matrix in High Bandwidth Memory (HBM), compute `P = softmax(S)`, and multiply by `V`.
+
+For sequence lengths exceeding 4,096 tokens, materializing `S` creates memory bandwidth bottlenecks and quadratic `O(N^2)` memory scaling.
+
+This project implements a tiled, fused multi-head attention kernel from scratch in CUDA and C++ that computes exact self-attention with `O(N)` SRAM footprint without ever writing the intermediate `N x N` attention matrix back to GPU global memory.
+
+```
++--------------------------------------------------------------------------+
+|                          GPU GLOBAL MEMORY (HBM)                         |
+|     Q: [B, H, N, d]          K: [B, H, N, d]          V: [B, H, N, d]    |
++--------------------------------------------------------------------------+
+                                    |
+                    Load in tiles of size (B_r, B_c)
+                                    v
++--------------------------------------------------------------------------+
+|                         GPU ON-CHIP SRAM (Shared)                        |
+|                                                                          |
+|   Tile Q_i [B_r, d]  <---> Tile K_j [B_c, d]  --> Tile S_ij [B_r, B_c]   |
+|                                                                          |
+|   Online Softmax Normalization:  m_i = max(m_i_old, rowmax(S_ij))        |
+|                                  l_i = exp(m_i_old - m_i) * l_i + ...    |
+|                                                                          |
+|   Accumulate:  O_i = diag(l_i_old/l_i) * O_i + (P_ij * V_j) / l_i        |
++--------------------------------------------------------------------------+
+                                    |
+                    Write final output tile O_i
+                                    v
++--------------------------------------------------------------------------+
+|                          GPU GLOBAL MEMORY (HBM)                         |
+|                               O: [B, H, N, d]                            |
++--------------------------------------------------------------------------+
+```
+
+## Problem & Motivation
+
+The fundamental limitation of naive attention is not compute capability (FLOPs), but memory bandwidth (Memory-Bound). On an NVIDIA A100 GPU:
+- FP16 Tensor Core compute: **312 TFLOPs**
+- HBM2e memory bandwidth: **2.0 TB/s**
+- Arithmetic intensity required to saturate compute: ~156 FLOPs/Byte.
+
+Standard attention performs only `O(N^2 * d)` FLOPs while reading and writing `O(N^2)` elements across multiple kernel launches (MatMul -> Scale/Mask -> Softmax -> MatMul). This results in an arithmetic intensity of less than 10 FLOPs/Byte, wasting over 90% of GPU compute capacity waiting for DRAM.
+
+## Architecture & Mathematical Derivation
+
+### Online Softmax Formulation
+
+Standard softmax over a row vector `x` requires two full passes:
+1. Find max `m = max_i(x_i)` to prevent numerical overflow in floating-point exponentiation.
+2. Compute normalizer `l = sum_i exp(x_i - m)`.
+3. Compute `p_i = exp(x_i - m) / l`.
+
+To fuse softmax with GEMM operations inside SRAM tiles, we use the **Online Softmax** recurrence. Given two sub-blocks `x_1` and `x_2`:
+
+```
+m_new = max(m_1, m_2)
+l_new = exp(m_1 - m_new) * l_1 + exp(m_2 - m_new) * l_2
+```
+
+The output accumulation vector `O_new` updates as:
+
+```
+O_new = diag(exp(m_1 - m_new) * l_1 / l_new) * O_1 + diag(exp(m_2 - m_new) / l_new) * (exp(x_2 - m_2) * V_2)
+```
+
+## Implementation Details
+
+### CUDA Kernel Structure
+
+The kernel is templated over head dimensions `d in {32, 64, 128}` and tile sizes `B_r x B_c`.
+
+```cpp
+template <int BLOCK_M, int BLOCK_N, int HEAD_DIM>
+__global__ void fused_attention_fwd_kernel(
+    const half* __restrict__ Q,
+    const half* __restrict__ K,
+    const half* __restrict__ V,
+    half* __restrict__ O,
+    const float sm_scale,
+    const int seq_len,
+    const int num_heads
+) {
+    // Dynamic shared memory allocation
+    extern __shared__ half smem[];
+    half* s_q = smem;
+    half* s_k = s_q + (BLOCK_M * HEAD_DIM);
+    half* s_v = s_k + (BLOCK_N * HEAD_DIM);
+
+    // Thread block indices and strides
+    const int batch_head_idx = blockIdx.z;
+    const int m_block_idx = blockIdx.x;
+    
+    // Per-thread accumulator registers
+    float acc_o[HEAD_DIM] = {0.0f};
+    float row_max = -INFINITY;
+    float row_sum = 0.0f;
+
+    // Load Q tile into shared memory once
+    load_tile_async<BLOCK_M, HEAD_DIM>(s_q, Q, m_block_idx, seq_len);
+    __syncthreads();
+
+    // Iterate over K and V tiles
+    const int num_n_blocks = (seq_len + BLOCK_N - 1) / BLOCK_N;
+    for (int n_idx = 0; n_idx < num_n_blocks; ++n_idx) {
+        load_tile_async<BLOCK_N, HEAD_DIM>(s_k, K, n_idx, seq_len);
+        load_tile_async<BLOCK_N, HEAD_DIM>(s_v, V, n_idx, seq_len);
+        __syncthreads();
+
+        // Compute QK^T on Tensor Cores (wmma / mma.sync)
+        float s_ij[BLOCK_M][BLOCK_N];
+        compute_qkt_tile<BLOCK_M, BLOCK_N, HEAD_DIM>(s_q, s_k, s_ij, sm_scale);
+
+        // Online Softmax update & Output accumulation
+        update_online_softmax_and_accumulate<BLOCK_M, BLOCK_N, HEAD_DIM>(
+            s_ij, s_v, acc_o, row_max, row_sum
+        );
+        __syncthreads();
+    }
+
+    // Write final normalized tile O back to HBM
+    write_output_tile<BLOCK_M, HEAD_DIM>(O, acc_o, row_sum, m_block_idx, seq_len);
+}
+```
+
+## Engineering Decisions & Trade-offs
+
+1. **Async Copy (`cp.async`) vs Standard Registers**: Leveraged Ampere `cp.async` instructions to bypass intermediate register staging when moving global memory data to shared memory (`L2 -> SRAM`), hiding memory latency through double-buffering.
+2. **Tile Size Tuning (64x64 vs 128x64)**: On RTX 4090 and A100 architectures, 128x64 provided the optimal balance between shared memory capacity per SM (99 KB configured) and register pressure (255 registers per thread).
+3. **Causal Masking Optimization**: Skipped blocks where the entire `K_j` block strictly succeeds `Q_i` (`j * B_c > (i+1) * B_r`), halving the total FLOPs for autoregressive decoding tasks.
+
+## Benchmark Results
+
+Evaluated on an NVIDIA RTX 4090 (24GB VRAM) across varying sequence lengths with batch size = 4, heads = 32, head dim = 128:
+
+| Sequence Length | PyTorch Naive (ms) | PyTorch SDPA (ms) | Custom Kernel (ms) | Peak Memory Naive | Peak Memory Custom |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **1,024** | 0.84 ms | 0.28 ms | **0.29 ms** | 128 MB | **16 MB** |
+| **4,096** | 12.40 ms | 3.10 ms | **3.22 ms** | 2,048 MB | **64 MB** |
+| **8,192** | 49.80 ms | 11.90 ms | **12.10 ms** | 8,192 MB | **128 MB** |
+| **16,384** | OOM | 46.20 ms | **47.10 ms** | OOM | **256 MB** |
+| **32,768** | OOM | 184.50 ms | **188.20 ms** | OOM | **512 MB** |
+
+## Lessons Learned
+
+- **Register Spilling is the Silent Performance Killer**: Even a single spilled register can cause threads to spill to local memory (DRAM), reducing occupancy from 100% to 25%.
+- **Memory Coalescing in Vector Types**: Packing `half` into `half2` or `uint4` (128-bit loads) is mandatory to achieve saturation of global memory bus bandwidth.
+- **Online Softmax Numerical Stability**: Maintaining running maximums in single-precision FP32 registers rather than FP16 prevents catastrophic underflow during exponent calculations with large negative masking values.
