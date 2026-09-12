@@ -79,6 +79,7 @@ export const ProfileSchema = z.object({
     linkedin: z.string().url(),
     x: z.string().url().optional(),
     email: z.string().email(),
+    medium: z.string().url().optional(),
   }),
   skills: z.object({
     languages: z.array(z.string()),

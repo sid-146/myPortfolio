@@ -10,6 +10,7 @@ export const profileData = {
     linkedin: "https://linkedin.com/in/sudhanwa-kaveeshwar",
     x: "https://x.com/sudhanwa_k",
     email: "kaveeshwar.sudhanwa@gmail.com",
+    medium: "https://medium.com/@sudhanwa.kaveeshwar",
   },
   skills: {
     languages: ["Python", "SQL", "Rust", "TypeScript", "C++"],

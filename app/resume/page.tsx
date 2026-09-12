@@ -2,7 +2,7 @@ import { Container } from "@/components/layout/Container";
 import { profileData } from "@/content/data/profile";
 import { experienceData } from "@/content/data/experience";
 import { Download, Mail, MapPin, Award, Zap, FileText } from "lucide-react";
-import { GithubIcon, LinkedinIcon } from "@/components/ui/Icons";
+import { GithubIcon, LinkedinIcon, MediumIcon } from "@/components/ui/Icons";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -105,6 +105,17 @@ export default function ResumePage() {
                             <LinkedinIcon size={12} />
                             linkedin.com/in/sudhanwa-kaveeshwar
                         </a>
+                        {profileData.socials.medium && (
+                            <a
+                                href={profileData.socials.medium}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 hover:underline text-zinc-600 dark:text-zinc-400 hover:text-emerald-500"
+                            >
+                                <MediumIcon size={12} />
+                                medium.com/@sudhanwa.kaveeshwar
+                            </a>
+                        )}
                     </div>
                 </header>
 

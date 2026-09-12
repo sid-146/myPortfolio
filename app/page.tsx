@@ -10,7 +10,7 @@ import {
     getNowData,
 } from "@/lib/content";
 import { ArrowRight, Mail, Terminal, Sparkles, Activity } from "lucide-react";
-import { GithubIcon, LinkedinIcon, TwitterIcon } from "@/components/ui/Icons";
+import { GithubIcon, LinkedinIcon, TwitterIcon, MediumIcon } from "@/components/ui/Icons";
 import { formatYear } from "@/lib/utils";
 
 export default function HomePage() {
@@ -61,6 +61,17 @@ export default function HomePage() {
                         <LinkedinIcon size={14} />
                         <span>LinkedIn</span>
                     </a>
+                    {profile.socials.medium && (
+                        <a
+                            href={profile.socials.medium}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-200 dark:border-zinc-800 bg-surface hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors text-zinc-700 dark:text-zinc-300"
+                        >
+                            <MediumIcon size={14} />
+                            <span>Medium</span>
+                        </a>
+                    )}
                     {profile.socials.x && (
                         <a
                             href={profile.socials.x}

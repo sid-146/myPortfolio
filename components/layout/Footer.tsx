@@ -106,6 +106,19 @@ export function Footer() {
                                         <ArrowUpRight size={12} />
                                     </a>
                                 </li>
+                                {profileData.socials.medium && (
+                                    <li>
+                                        <a
+                                            href={profileData.socials.medium}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 hover:text-emerald-500 transition-colors"
+                                        >
+                                            <span>Medium</span>
+                                            <ArrowUpRight size={12} />
+                                        </a>
+                                    </li>
+                                )}
                                 <li>
                                     <a
                                         href={`mailto:${profileData.socials.email}`}
