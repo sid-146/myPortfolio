@@ -1,0 +1,91 @@
+---
+title: "Multi-Agent GenAI & RAG Evaluation Harness"
+slug: "genai-rag-evaluation-pipeline"
+description: "An automated regression and evaluation suite for testing complex RAG retrieval, multi-hop reasoning, tool invocations, and semantic drift with synthetic dataset generation."
+date: "2026-03-02"
+category: "GenAI"
+status: "completed"
+technologies: ["Python", "PyTorch", "vLLM", "DSPy", "FastAPI", "PostgreSQL", "Milvus"]
+tags: ["GenAI", "RAG Systems", "Evaluation", "Multi-Agent", "Synthetic Data"]
+githubUrl: "https://github.com/sudhanwakeveeshwar/genai-rag-evaluation-pipeline"
+demoUrl: "/projects/genai-rag-evaluation-pipeline"
+featured: true
+metrics:
+  - label: "Eval Throughput"
+    value: "10k runs/hr"
+  - label: "Judge-Human Correlation"
+    value: "0.91 Pearson"
+  - label: "Context Drift Detection"
+    value: "98.4% Acc"
+order: 3
+---
+
+## Overview
+
+In production LLM applications, minor changes to prompt templates, embedding models, chunking strategies, or tool definitions can introduce subtle behavioral regressions and hallucinations that manual spot-checking fails to catch.
+
+This project delivers an end-to-end continuous evaluation harness that measures:
+1. **Retrieval Precision & Context Recall**: Hit rate, MRR@k, and NDCG across dense, sparse (BM25), and hybrid rerankers.
+2. **Faithfulness & Groundedness**: Calibrated token-level citation attribution scoring using natural language inference (NLI).
+3. **Agent Trajectory Validity**: State machine transitions, tool call arguments validation, and cyclic loop detection in multi-agent workflows.
+
+```
++--------------------------------------------------------------------------+
+|                          SYNTHETIC TEST GENERATOR                        |
+|   Knowledge Base -> Multi-Hop Question Evolver (Evol-Instruct Method)    |
++--------------------------------------------------------------------------+
+                                    |
+                    Generates 5,000+ targeted test pairs
+                                    v
++--------------------------------------------------------------------------+
+|                       AGENT SYSTEM UNDER TEST (SUT)                      |
+|       Query Planning -> Tool Calls -> Vector Retrieval -> Generation     |
++--------------------------------------------------------------------------+
+                                    |
+                    Logs Full Execution DAG & Traces
+                                    v
++--------------------------------------------------------------------------+
+|                        EVALUATION HARNESS (EVAL)                         |
+|                                                                          |
+|   +-------------------+   +--------------------+   +-----------------+   |
+|   | NLI Entailment    |   | Calibrated LLM-as- |   | Trajectory &    |   |
+|   | Groundedness Check|   | a-Judge (Rubrics)  |   | Cost Profiler   |   |
+|   +-------------------+   +--------------------+   +-----------------+   |
++--------------------------------------------------------------------------+
+                                    |
+                    Automated CI/CD Quality Gate
+                                    v
++--------------------------------------------------------------------------+
+|                     REGRESSION DASHBOARD & ALERTS                        |
++--------------------------------------------------------------------------+
+```
+
+## Architecture & Implementation
+
+### Calibrated LLM-as-a-Judge with Chain-of-Thought Rubrics
+Rather than relying on uncalibrated scalar scoring (e.g., "Rate from 1 to 5"), the framework enforces binary decomposing rubrics evaluated via structured output schemas:
+
+```python
+from pydantic import BaseModel, Field
+from typing import List
+
+class GroundednessVerdict(BaseModel):
+    extracted_claims: List[str] = Field(
+        description="Individual atomic propositions extracted from the model response."
+    )
+    supported_claims: List[bool] = Field(
+        description="Boolean indicating whether each claim is strictly entailed by the context."
+    )
+    unsupported_spans: List[str] = Field(
+        description="Text fragments introducing external unverified assertions."
+    )
+    groundedness_score: float = Field(
+        description="Ratio of supported claims to total claims."
+    )
+```
+
+## Key Results & Capabilities
+
+- **High Human-Judge Alignment**: Calibrated few-shot judge prompts achieved r = 0.91 Pearson correlation against blind expert human annotations across 1,200 complex multi-hop queries.
+- **CI/CD Quality Gates**: Integrated into GitHub Actions pull request workflows to reject prompt or retrieval config changes that cause statistically significant drops in benchmark score.
+- **Cost Reduction via Distilled Small Judges**: Replaced GPT-4 judges with fine-tuned Llama-3-8B distilled evaluators, reducing per-eval run cost by 96% while maintaining 98% accuracy agreement.

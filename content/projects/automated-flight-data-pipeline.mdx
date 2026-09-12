@@ -1,0 +1,93 @@
+---
+title: "Automated Flight Data Pipeline with Medallion Architecture"
+slug: "automated-flight-data-pipeline"
+description: "A robust end-to-end data pipeline using Apache Airflow, Apache Spark, PostgreSQL, and AWS S3 with Medallion architecture (Bronze, Silver, Gold)."
+date: "2024-04-10"
+category: "Data Engineering"
+status: "completed"
+technologies: ["Apache Airflow", "Apache Spark", "PostgreSQL", "AWS S3", "Python", "Docker"]
+tags: ["Data Engineering", "ETL Pipeline", "Medallion Architecture", "Spark", "Airflow"]
+githubUrl: "https://github.com/sid-146/automated-flight-data-pipeline"
+demoUrl: "/projects/automated-flight-data-pipeline"
+featured: true
+metrics:
+  - label: "Pipeline Architecture"
+    value: "Medallion (Bronze/Silver/Gold)"
+  - label: "Transformation Engine"
+    value: "Apache Spark"
+  - label: "Orchestration"
+    value: "Airflow DAGs"
+order: 5
+---
+
+## Overview
+
+Air travel generates complex, continuous telemetry and flight tracking records. To make this data reliably queryable for operational analytics and delay forecasting, raw telemetry feeds must be ingested, cleaned, partitioned, and modeled into analytical data marts.
+
+This project delivers an automated flight data pipeline structured around the **Medallion Architecture** pattern:
+- **Bronze Layer (Raw Ingest)**: Raw JSON and CSV flight logs landed directly into AWS S3 with immutable metadata timestamps.
+- **Silver Layer (Cleaned & Validated)**: Spark batch jobs performing deduplication, schema enforcement, timestamp normalization, and null-value imputation.
+- **Gold Layer (Aggregated Data Marts)**: Dimensional models (Star schema) loaded into PostgreSQL for analytical reporting and KPI dashboards.
+
+```
++--------------------------------------------------------------------------+
+|                            INGESTION SOURCES                             |
+|          OpenSky Network API / ADS-B Flight Telemetry Streams            |
++--------------------------------------------------------------------------+
+                                    |
+                       Airflow Scheduled Fetch Task
+                                    v
++--------------------------------------------------------------------------+
+|                       BRONZE LAYER (Raw Data Lake)                       |
+|                   AWS S3 / S3-Compatible Object Store                     |
++--------------------------------------------------------------------------+
+                                    |
+                    PySpark Distributed Transformation
+                                    v
++--------------------------------------------------------------------------+
+|                       SILVER LAYER (Cleaned Parquet)                     |
+|           Schema Validation, Deduplication, Null Sanitization            |
++--------------------------------------------------------------------------+
+                                    |
+                       Spark Aggregation & Modeling
+                                    v
++--------------------------------------------------------------------------+
+|                       GOLD LAYER (Analytical Data Mart)                  |
+|                 PostgreSQL Dimensional Star Schema & Power BI            |
++--------------------------------------------------------------------------+
+```
+
+## Architecture & Implementation
+
+### Orchestration & DAG Design
+Airflow DAGs manage task scheduling, dynamic backfilling, retry backoffs, and dependency tracking. A dedicated task logs operational execution metadata directly to PostgreSQL audit tables.
+
+```python
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime, timedelta
+
+default_args = {
+    "owner": "sudhanwa",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 1, 1),
+    "retries": 2,
+    "retry_delay": timedelta(minutes=5),
+}
+
+with DAG(
+    "flight_data_medallion_pipeline",
+    default_args=default_args,
+    schedule_interval="@daily",
+    catchup=False,
+) as dag:
+    # 1. Ingest raw telemetry to S3 Bronze
+    # 2. Trigger PySpark Silver cleanup & deduplication
+    # 3. Compute Gold aggregations and load to Postgres
+    pass
+```
+
+## Key Capabilities & Reliability
+- **Traceability & Auditing**: Detailed pipeline logs stored in PostgreSQL enable tracking historical run durations, processed row counts, and data anomaly flags.
+- **Configuration Management**: Decoupled environment configs and connection hooks across local Docker development and cloud deployments.
+- **Error Handling**: Automated alerts and retry policies mitigate transient network errors during external API ingestion.

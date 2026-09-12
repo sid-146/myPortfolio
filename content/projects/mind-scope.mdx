@@ -1,0 +1,76 @@
+---
+title: "MindScope: Modular LLM Persona-Aligned Insights & EDA Engine"
+slug: "mind-scope"
+description: "A modular Python package leveraging Large Language Models for persona-aligned automated exploratory data analysis, summarization, and goal generation."
+date: "2024-02-18"
+category: "GenAI"
+status: "completed"
+technologies: ["Python", "OpenAI SDK", "LangChain", "Pandas", "Streamlit", "Pydantic"]
+tags: ["GenAI", "LLM Package", "EDA", "Persona Modeling", "Open Source"]
+githubUrl: "https://github.com/sid-146/mind-scope"
+demoUrl: "/projects/mind-scope"
+featured: true
+metrics:
+  - label: "Deployable Personas"
+    value: "10+ Profiles"
+  - label: "Modules"
+    value: "Summarizer, EDA, Goals"
+  - label: "Package Format"
+    value: "PyPI Modular Package"
+order: 6
+---
+
+## Overview
+
+Traditional automated Exploratory Data Analysis (EDA) tools generate generic statistical summaries that lack domain-specific interpretation. A business analyst, a risk manager, and an ML engineer inspect the same dataset through entirely different lenses and priorities.
+
+**MindScope** is an open-source modular Python framework that combines algorithmic data profiling with LLM-powered persona alignment. Users can pass any tabular dataset or report and obtain insights tailored specifically to over 10+ distinct professional personas (such as Executive Leadership, Quantitative Researcher, Risk Auditor, or Product Manager).
+
+```
++--------------------------------------------------------------------------+
+|                               INPUT DATASET                              |
+|                   Pandas DataFrame / CSV / Parquet File                  |
++--------------------------------------------------------------------------+
+                                    |
+                    Statistical Profile & Feature Extraction
+                                    v
++--------------------------------------------------------------------------+
+|                           MINDSCOPE CORE ENGINE                          |
+|                                                                          |
+|   +-------------------+   +--------------------+   +-----------------+   |
+|   | Data Summarizer   | ->| Persona-Alignment  | ->| Strategic Goal  |   |
+|   | & Trend Extractor |   | Modeling Engine    |   | Generator       |   |
+|   +-------------------+   +--------------------+   +-----------------+   |
++--------------------------------------------------------------------------+
+                                    |
+                    Structured Output via Pydantic Schemas
+                                    v
++--------------------------------------------------------------------------+
+|                          PERSONA-ALIGNED REPORTS                         |
+|        Executive Briefings / Risk Warnings / Technical Action Plans      |
++--------------------------------------------------------------------------+
+```
+
+## Modular Components
+
+1. **Summarizer Module**: Extracts statistical distributions, outliers, cardinality, and correlation matrices, feeding high-information-density contexts into prompt windows.
+2. **Persona-Modeling Module**: Applies carefully calibrated system prompts with cognitive frameworks representing 10+ distinct roles.
+3. **Goal-Generation Module**: Translates discovered data anomalies into actionable strategic objectives and follow-up inquiry suggestions.
+
+```python
+from mindscope import PersonaAnalyzer, DatasetProfiler
+
+# Load dataset
+profiler = DatasetProfiler.from_csv("quarterly_health_metrics.csv")
+
+# Initialize persona engine
+analyzer = PersonaAnalyzer(persona="Chief_Medical_Officer")
+insights = analyzer.generate_insights(profiler.summary())
+
+print(insights.executive_summary)
+print(insights.strategic_goals)
+```
+
+## Key Technical Achievements
+- **Structured LLM Generation**: Enforced deterministic JSON/Pydantic schemas for downstream integration into dashboards and reporting systems.
+- **Low-Latency Profiling**: Vectorized Pandas pre-filtering ensures token context limits are respected without dropping salient statistical signals.

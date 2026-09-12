@@ -1,0 +1,68 @@
+---
+title: "Zero-Copy Data Pipelines in Rust with Apache Arrow"
+slug: "zero-copy-data-pipelines-in-rust"
+date: "2026-06-18"
+description: "How memory-mapped buffers, cache line alignment, and Apache Arrow columnar formats eliminate serialization overhead in high-throughput analytical streaming."
+tags: ["Rust", "Apache Arrow", "Data Engineering", "Performance", "Systems"]
+published: true
+---
+
+In traditional data engineering architectures, data repeatedly moves between network buffers, JSON/Protobuf deserializers, object heaps, and analytical dataframes. Each intermediate boundary forces CPU memory copies, context switching, and garbage collection pressure.
+
+When processing millions of events per second, the time spent serializing and deserializing payloads easily exceeds the actual analytical compute time.
+
+## The Cost of Traditional Row Serialization
+
+Consider a standard pipeline receiving JSON payloads over Kafka into a JVM consumer:
+
+```
+[TCP Socket Buffer] 
+    --(Copy 1)--> [JVM Byte Array] 
+    --(Parse/Deserialize)--> [Java Heap Objects (HashMap/POJO)] 
+    --(Serialize)--> [Protobuf/Parquet Columnar Format]
+```
+
+This model suffers from three primary inefficiencies:
+1. **Pointer Chasing**: Java objects are scattered across memory, causing frequent L1/L2 CPU cache misses.
+2. **Multiple Memory Copies**: Data is copied 3-5 times between kernel space and user space.
+3. **GC Overhead**: Creating millions of short-lived objects triggers stop-the-world garbage collection pauses.
+
+## The Zero-Copy Arrow Paradigm
+
+**Apache Arrow** standardizes an in-memory columnar format with specified memory layouts for primitive, nested, and dictionary types.
+
+In Rust, we can map incoming network or disk memory pages directly into Arrow `Buffer` slices without copying or modifying bytes:
+
+```rust
+use arrow::buffer::Buffer;
+use arrow::array::Int64Array;
+use std::sync::Arc;
+
+pub fn process_mmap_buffer(raw_ptr: *const u8, len: usize) -> Arc<Int64Array> {
+    // Zero-copy wrap raw memory pointer into Arrow Buffer
+    let buffer = unsafe {
+        Buffer::from_custom_allocation(
+            std::ptr::NonNull::new(raw_ptr as *mut u8).unwrap(),
+            len,
+            Arc::new(()),
+        )
+    };
+
+    // Construct typed columnar array referencing existing memory slice
+    let int_array = Int64Array::new(len / std::mem::size_of::<i64>(), buffer, None, 0);
+    Arc::new(int_array)
+}
+```
+
+## SIMD Vectorization Over Contiguous Memory
+
+Because the data is stored in contiguous, 64-byte aligned memory chunks, modern CPUs can execute SIMD (Single Instruction, Multiple Data) instructions over Arrow vectors:
+
+- **AVX2**: Evaluates 8 32-bit integers or 4 64-bit integers per clock cycle.
+- **AVX-512**: Evaluates 16 32-bit integers per clock cycle.
+
+## Real-World Takeaways
+
+- **Prefer Columnar Early**: Convert semi-structured payloads to Arrow `RecordBatch` at the network ingress boundary.
+- **Utilize Flight RPC**: Replace REST / JSON APIs with Arrow Flight (gRPC + IPC streaming) to transfer raw columnar memory across microservices without serialization.
+- **Leverage Memory-Mapped I/O**: For large analytical datasets on NVMe storage, `mmap` combined with Arrow allows querying datasets larger than physical RAM with automated OS page caching.

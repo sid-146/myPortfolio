@@ -1,0 +1,84 @@
+---
+title: "Understanding KV-Cache Optimization in Modern LLM Serving"
+slug: "understanding-kv-cache-optimization"
+date: "2026-08-04"
+description: "A deep dive into Key-Value caching mechanics, memory fragmentation bottlenecks, PagedAttention, Multi-Query Attention (MQA), and speculative prefix caching."
+tags: ["LLM Inference", "Systems", "CUDA", "vLLM", "Memory Optimization"]
+published: true
+---
+
+During autoregressive text generation in large language models, generating token `t+1` requires the Key and Value projections of all preceding tokens `1, 2, ..., t`. To avoid recomputing these projections at every single forward pass (which would turn an `O(N^2)` process into `O(N^3)`), inference engines cache the **K** and **V** tensors in GPU memory—commonly known as the **KV-Cache**.
+
+However, as sequence lengths expand to 32k, 64k, or 128k tokens, KV-cache memory rapidly dwarfs the model weights themselves, becoming the primary bottleneck for serving throughput and concurrency.
+
+## The Memory Math Behind KV-Cache
+
+Let:
+- `L` = Number of transformer layers
+- `H_kv` = Number of Key/Value attention heads
+- `D` = Hidden dimension per head
+- `B` = Batch size
+- `N` = Context length (tokens)
+- `P` = Precision in bytes (2 bytes for FP16/BF16, 1 byte for FP8)
+
+The memory footprint in bytes for a single request of length `N` across both Key and Value tensors is:
+
+```
+Memory_KV = 2 * L * H_kv * D * N * P
+```
+
+### Concrete Example: Llama-3-70B
+
+For Llama-3-70B:
+- Layers `L = 80`
+- Head dimension `D = 128`
+- Grouped-Query Attention (GQA) with `H_kv = 8` heads (compared to 64 query heads)
+- Precision `P = 2` (FP16)
+
+For a single request at `N = 8,192` tokens:
+
+```
+Memory_KV = 2 * 80 * 8 * 128 * 8,192 * 2 = 2,684,354,560 bytes ≈ 2.68 GB
+```
+
+If we attempt to serve a batch of 32 concurrent requests with 8k context length, the KV cache requires **85.7 GB of GPU VRAM**—more than an entire NVIDIA A100 (80GB) GPU can store, exclusively for cache tensors!
+
+## Bottleneck 1: Memory Fragmentation
+
+In naive memory allocation strategies, memory for the maximum context window (e.g. 8k tokens) is allocated up-front contiguously in GPU virtual memory. This causes two severe types of memory waste:
+1. **Internal Fragmentation**: Allocating 8k tokens for a request that finishes after 200 tokens.
+2. **External Fragmentation**: Inability to allocate memory for incoming requests because contiguous chunks are split across active jobs.
+
+```
+Naive Allocation (Contiguous Pre-allocation):
+[ Token 1-100 (Used) | Unused Reserved Slots (Wasted VRAM) .............. ]
+```
+
+### PagedAttention Solution
+
+Inspired by virtual memory paging in operating systems, **PagedAttention** (pioneered by vLLM) partitions the KV cache of each sequence into fixed-size physical blocks (e.g., 16 or 32 tokens per block). 
+
+Logical blocks within a sequence are mapped to non-contiguous physical blocks via a block table.
+
+```
+Logical Sequence: [Block 0] -> [Block 1] -> [Block 2]
+                      |            |            |
+Block Table Map:      v            v            v
+Physical Memory:   [Phy #42]    [Phy #7]     [Phy #89]
+```
+
+This reduces memory waste to under 4% (limited only to the final block of a sequence), enabling a 2-4x increase in batch size and server throughput without changing model output.
+
+## Architectural Evolutions: MHA vs MQA vs GQA
+
+| Architecture | Query Heads | Key/Value Heads | KV Cache Size vs MHA | Quality Impact |
+| :--- | :--- | :--- | :--- | :--- |
+| **Multi-Head Attention (MHA)** | `H` | `H` | 1.0x (100%) | Baseline |
+| **Multi-Query Attention (MQA)** | `H` | 1 | `(1 / H)x` (~3%) | Slight degradation on complex multi-hop |
+| **Grouped-Query Attention (GQA)** | `H` | `G (G << H)` | `(G / H)x` (~12.5%) | Near-lossless output quality |
+
+## Practical Takeaways for Systems Engineers
+
+1. **Adopt FP8 KV-Cache Quantization**: Quantizing KV tensors to FP8 halves cache footprint with negligible perplexity degradation, doubling max concurrency.
+2. **Prefix Caching for System Prompts**: When multiple requests share identical system instructions or document context (common in RAG and agent architectures), caching the shared prefix reduces time-to-first-token by 80%.
+3. **Speculative Decoding Synergy**: Speculative decoding allows parallel verification of multiple draft tokens, effectively trading cheap compute for higher memory bandwidth efficiency.
