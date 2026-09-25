@@ -1,5 +1,5 @@
 export const nowData = {
-  lastUpdated: "2026-09-23",
+  lastUpdated: "2026-09-21",
   location: "Pune, India",
   headline: "What I'm currently focused on right now.",
   sections: [
