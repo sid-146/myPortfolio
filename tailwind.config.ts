@@ -54,6 +54,12 @@ const config: Config = {
             "code::after": {
               content: '""',
             },
+            "pre code": {
+              backgroundColor: "transparent",
+              padding: "0",
+              borderRadius: "0",
+              color: "inherit",
+            },
           },
         },
       },

@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://sudhanwakaveeshwar.dev/sitemap.xml",
+    sitemap: "https://my-portfolio-puce-six-34.vercel.app/sitemap.xml",
   };
 }
