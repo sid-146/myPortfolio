@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-    metadataBase: new URL("https://sudhanwakaveeshwar.dev"),
+    metadataBase: new URL("https://my-portfolio-puce-six-34.vercel.app"),
     title: {
         default: "Sudhanwa Kaveeshwar | AI & Data Systems Engineer",
         template: "%s | Sudhanwa Kaveeshwar",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     openGraph: {
         type: "website",
         locale: "en_US",
-        url: "https://sudhanwakaveeshwar.dev",
+        url: "https://my-portfolio-puce-six-34.vercel.app",
         title: "Sudhanwa Kaveeshwar | AI & Data Systems Engineer",
         description:
             "Engineering portfolio focusing on AI Engineering, Distributed Data Systems, Low-Latency LLM Serving, and Systems Thinking.",

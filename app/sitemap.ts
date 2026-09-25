@@ -2,7 +2,7 @@ import { MetadataRoute } from "next";
 import { getAllProjects, getAllArticles } from "@/lib/content";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://sudhanwakaveeshwar.dev";
+  const baseUrl = "https://my-portfolio-puce-six-34.vercel.app/";
 
   const staticRoutes = [
     "",

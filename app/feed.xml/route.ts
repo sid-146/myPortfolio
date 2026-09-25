@@ -2,7 +2,7 @@ import { getAllArticles } from "@/lib/content";
 
 export async function GET() {
   const articles = getAllArticles();
-  const siteUrl = "https://sudhanwakaveeshwar.dev";
+  const siteUrl = "https://my-portfolio-puce-six-34.vercel.app";
 
   const rssFeed = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">

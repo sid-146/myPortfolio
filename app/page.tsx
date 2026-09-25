@@ -11,6 +11,7 @@ import {
 } from "@/lib/content";
 import { ArrowRight, Mail, Terminal, Sparkles, Activity } from "lucide-react";
 import { GithubIcon, LinkedinIcon, TwitterIcon, MediumIcon } from "@/components/ui/Icons";
+import { EmailContact } from "@/components/ui/EmailContact";
 import { formatYear } from "@/lib/utils";
 
 export default function HomePage() {
@@ -83,13 +84,11 @@ export default function HomePage() {
                             <span>X / Twitter</span>
                         </a>
                     )}
-                    <a
-                        href={`mailto:${profile.socials.email}`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-zinc-200 dark:border-zinc-800 bg-surface hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors text-zinc-700 dark:text-zinc-300"
-                    >
-                        <Mail size={14} />
-                        <span>Email</span>
-                    </a>
+                    <EmailContact
+                        email={profile.socials.email}
+                        variant="button"
+                        direction="down"
+                    />
                 </div>
             </section>
 

@@ -31,12 +31,12 @@ export function CodeBlock({ children, className, ...props }: CodeBlockProps) {
         }
     };
 
+    const language = className ? className.replace("language-", "") : "code";
+
     return (
-        <div className="relative group my-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-950 dark:bg-[#0c0c0e] overflow-hidden text-zinc-100">
-            <div className="flex items-center justify-between px-4 py-1.5 border-b border-zinc-800/80 bg-zinc-900/60 font-mono text-[11px] text-zinc-400">
-                <span>
-                    {className ? className.replace("language-", "") : "code"}
-                </span>
+        <div className="not-prose relative group my-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-950 dark:bg-[#0c0c0e] overflow-hidden text-zinc-100">
+            <div className="flex items-center justify-between px-4 py-1.5 border-b border-zinc-800/80 bg-zinc-900/60 font-mono text-[11px] text-zinc-400 select-none">
+                <span>{language}</span>
                 <button
                     onClick={handleCopy}
                     aria-label="Copy code to clipboard"
@@ -55,11 +55,14 @@ export function CodeBlock({ children, className, ...props }: CodeBlockProps) {
                     )}
                 </button>
             </div>
-            <div className="p-4 overflow-x-auto text-xs sm:text-sm font-mono leading-relaxed">
-                <code className={className} {...props}>
+            <pre className="codeblock-pre p-4 overflow-x-auto text-xs sm:text-sm font-mono leading-relaxed text-zinc-100 whitespace-pre !bg-transparent !border-0 !m-0 !p-4">
+                <code
+                    className={`block w-fit min-w-full font-mono text-zinc-100 bg-transparent p-0 border-0 ${className || ""}`}
+                    {...props}
+                >
                     {children}
                 </code>
-            </div>
+            </pre>
         </div>
     );
 }

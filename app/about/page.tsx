@@ -8,6 +8,7 @@ import {
     BookOpen,
     Layers,
 } from "lucide-react";
+import { EmailContact } from "@/components/ui/EmailContact";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -189,12 +190,11 @@ export default function AboutPage() {
                 <span className="text-zinc-500">
                     Interested in technical collaboration?
                 </span>
-                <a
-                    href={`mailto:${profile.socials.email}`}
-                    className="text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
-                >
-                    Reach out via email →
-                </a>
+                <EmailContact
+                    email={profile.socials.email}
+                    variant="link"
+                    direction="up"
+                />
             </section>
         </Container>
     );

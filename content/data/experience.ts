@@ -2,7 +2,7 @@ export const experienceData = [
   {
     company: "Bajaj Finserv Health",
     role: "Data Scientist",
-    period: "2024 — Present",
+    period: "10/2024 — 06/2026",
     location: "Pune, India",
     type: "Full-time" as const,
     summary:

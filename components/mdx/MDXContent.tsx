@@ -1,9 +1,11 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
+import remarkGfm from "remark-gfm";
 import { CodeBlock } from "./CodeBlock";
 import { Callout } from "./Callout";
 import { MetricsGrid } from "./MetricsGrid";
 import Link from "next/link";
 import React from "react";
+import { cn } from "@/lib/utils";
 
 function generateSlug(text: any): string {
     if (typeof text !== "string") {
@@ -130,29 +132,33 @@ const customComponents = {
         );
     },
     pre: ({ children, ...props }: any) => {
-        // If the child is a code element, extract props
-        if (children && children.props && children.props.className) {
+        // MDX produces <pre><code className="language-xyz">...</code></pre>
+        // or <pre><code>...</code></pre> for untagged blocks.
+        let child = children;
+        if (Array.isArray(children) && children.length === 1) {
+            child = children[0];
+        }
+
+        if (React.isValidElement(child)) {
+            const childProps = (child as React.ReactElement<any>).props;
             return (
-                <CodeBlock className={children.props.className} {...props}>
-                    {children.props.children}
+                <CodeBlock className={childProps?.className} {...props}>
+                    {childProps?.children ?? child}
                 </CodeBlock>
             );
         }
+
         return <CodeBlock {...props}>{children}</CodeBlock>;
     },
     code: ({ className, children, ...props }: any) => {
-        if (!className) {
-            return (
-                <code
-                    className="px-1.5 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-800/70 text-zinc-900 dark:text-zinc-200 font-mono text-xs sm:text-[13px] border border-zinc-300/60 dark:border-zinc-700/50"
-                    {...props}
-                >
-                    {children}
-                </code>
-            );
-        }
         return (
-            <code className={className} {...props}>
+            <code
+                className={cn(
+                    "px-1.5 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-800/70 text-zinc-900 dark:text-zinc-200 font-mono text-xs sm:text-[13px] border border-zinc-300/60 dark:border-zinc-700/50",
+                    className
+                )}
+                {...props}
+            >
                 {children}
             </code>
         );
@@ -166,9 +172,9 @@ const customComponents = {
         </blockquote>
     ),
     table: ({ children, ...props }: any) => (
-        <div className="my-6 w-full overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <div className="not-prose my-6 w-full overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-surface/50">
             <table
-                className="w-full text-left text-xs sm:text-sm font-mono"
+                className="w-full text-left text-xs sm:text-sm font-mono border-collapse"
                 {...props}
             >
                 {children}
@@ -177,7 +183,7 @@ const customComponents = {
     ),
     thead: ({ children, ...props }: any) => (
         <thead
-            className="border-b border-zinc-200 dark:border-zinc-800 bg-surface-muted text-zinc-900 dark:text-zinc-100"
+            className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100"
             {...props}
         >
             {children}
@@ -200,12 +206,18 @@ const customComponents = {
         </tr>
     ),
     th: ({ children, ...props }: any) => (
-        <th className="px-4 py-2.5 font-semibold" {...props}>
+        <th
+            className="px-4 py-2.5 font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap"
+            {...props}
+        >
             {children}
         </th>
     ),
     td: ({ children, ...props }: any) => (
-        <td className="px-4 py-2.5 text-zinc-700 dark:text-zinc-300" {...props}>
+        <td
+            className="px-4 py-2.5 text-zinc-700 dark:text-zinc-300 whitespace-nowrap"
+            {...props}
+        >
             {children}
         </td>
     ),
@@ -222,7 +234,15 @@ interface MDXContentProps {
 export function MDXContent({ source }: MDXContentProps) {
     return (
         <div className="mdx-content">
-            <MDXRemote source={source} components={customComponents} />
+            <MDXRemote
+                source={source}
+                components={customComponents}
+                options={{
+                    mdxOptions: {
+                        remarkPlugins: [remarkGfm],
+                    },
+                }}
+            />
         </div>
     );
 }
